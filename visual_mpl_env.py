@@ -9,6 +9,7 @@ import struct
 import numpy as np
 import yaml
 from multiprocessing import Queue
+from collections import deque
 
 dirname = os.path.dirname(__file__)
 DEFAULT_ENV_PATH = os.path.join(dirname, "./MPL/include_MPL.xml")
@@ -39,6 +40,7 @@ class VisuMPL:
     self.mj_data = mujoco.MjData(self.mj_model)
     self.ctrl_queue: Queue = Queue(maxsize=1)
     self.v = None
+    self.key_presses = deque(maxlen=20)
     pass
 
   def set_mocap(self, pos, quat):
@@ -85,7 +87,7 @@ class VisuMPL:
       mocap_spec = self._clear_assets(spec.copy())
       fr.attach_body(mocap_spec.body("mocap"), prefix="ref_")
       spec.add_equality(type=mujoco.mjtEq.mjEQ_WELD, objtype=mujoco.mjtObj.mjOBJ_BODY,
-                                  name1='ref_mocap', name2='ref_forearm', solref=(.001, 1.4), solimp=(.99,.99,0.0001, 0.5, 2))
+                                  name1='ref_mocap', name2='ref_forearm', solref=(.0001, 1.4), solimp=(.99,.99,0.0001, 0.5, 2))
 
 
     return spec
@@ -101,8 +103,11 @@ class VisuMPL:
     from mujoco import viewer
     from loop_rate_limiters import RateLimiter
 
+    def key_callback(keycode):
+      self.key_presses.append(chr(keycode))
+
     rate = RateLimiter(frequency=1 / self.mj_model.opt.timestep // self.config.n_substeps, warn=False)
-    with viewer.launch_passive(self.mj_model, self.mj_data, show_left_ui=False, show_right_ui=False) as self.v:
+    with viewer.launch_passive(self.mj_model, self.mj_data, show_left_ui=False, show_right_ui=False, key_callback=key_callback) as self.v:
       # setup v.user_scn here https://mujoco.readthedocs.io/en/latest/python.html#passive-viewer
       self.v.sync()
       most_recent_control = np.zeros(self.mj_model.nu)
@@ -139,6 +144,8 @@ if __name__ == '__main__':
   def dummy_ctrl():
     while True:
       visu.ctrl_queue.put(np.sin(visu.mj_data.time) * np.ones(visu.mj_model.nu))
+
+
 
   import threading
   t = threading.Thread(target=visu.start_visu)
