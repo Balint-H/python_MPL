@@ -51,6 +51,9 @@ class VisuMPL:
     self.mj_data.ctrl = actions
     mujoco.mj_step(self.mj_model, self.mj_data, self.config.n_substeps)
 
+  def set_ref_color(self, rgba):
+    for g in [_g for _g in self.spec.geoms if "ref_" in _g.name]:
+      self.mj_model.geom_rgba[self.mj_model.geom(g.name).id] = rgba
 
   def preprocess_spec(self, spec: MjSpec):
     if self.config.shorten_thumb:
@@ -126,7 +129,7 @@ def load_config_from_yaml(file_path: str) -> config_dict.ConfigDict:
 
 if __name__ == '__main__':
   visu = VisuMPL()
-
+  visu.set_ref_color(np.array([0.8, 0.3, 0.1, 1]))
   from mujoco import viewer
   from loop_rate_limiters import RateLimiter
 
